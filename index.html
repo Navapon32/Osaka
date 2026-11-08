@@ -69,7 +69,13 @@ body[data-view="saved"] .layout,body[data-view="saved"] #mapView{display:none}
 :root[data-theme="dark"] .gallery-card{background:var(--surface);border-color:var(--line)}
 :root[data-theme="dark"] .gallery-card div{color:#e7d3a7}
 :root[data-theme="dark"] .save-place.saved{background:#403722;color:#f1d99e}
-:root[data-theme="dark"] .day-divider{border-color:var(--line)}
+:root[data-theme="dark"] .day-divider{border-color:var(--line)}:root[data-theme="dark"] .bottom-nav{background:#111a35f2;border-color:#30394a}
+:root[data-theme="dark"] .bottom-nav button{color:#b8c0d3}
+:root[data-theme="dark"] .bottom-nav button.active{background:#30394a;color:#f1d99e}
+:root[data-theme="dark"] .day-divider strong{color:#e7d3a7}
+:root[data-theme="dark"] .view-heading p{color:#a6afbf}
+@media(max-width:850px){body[data-view="map"] .mapbox{box-shadow:0 8px 28px #0004}}
+
 @media(max-width:850px){
  body{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
  .hero{padding:22px 18px 20px}
