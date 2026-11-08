@@ -230,6 +230,18 @@ const savedPlaces=new Set();try{JSON.parse(localStorage.getItem('osaka-saved')||
 let currentView='trip';
 function setView(view){currentView=view;document.body.dataset.view=view;document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(view==='map'){setTimeout(()=>map.invalidateSize(),120);const a=filtered();if(a.length)map.fitBounds(L.featureGroup(a.map(p=>markers[p.id])).getBounds().pad(.12),{maxZoom:12});}if(view==='photos')buildGallery();if(view==='saved')buildSaved();}
 document.querySelectorAll('.bottom-nav button').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+
+// Station helper uses only station/transport points already present in the itinerary.
+// Straight-line distance is indicative; walking/bus/rail route should be checked in Maps.
+function tripDistanceKm(a,b){const r=x=>x*Math.PI/180,lat=r(b.lat-a.lat),lng=r(b.lng-a.lng);const h=Math.sin(lat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(lng/2)**2;return 6371*2*Math.asin(Math.sqrt(h));}
+function nearestTripStation(p){
+ const stations=places.filter(x=>x.cat==='transport'&&/(station|สถานี)/i.test(x.name)&&!/(airport|สนามบิน)/i.test(x.name));
+ const ranked=stations.map(x=>({station:x,distance:tripDistanceKm(p,x)})).sort((a,b)=>a.distance-b.distance);
+ return ranked[0]&&ranked[0].distance<=5?ranked[0]:null;
+}
+function mapsTransitUrl(origin,destination){
+ return 'https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(origin.lat+','+origin.lng)+'&destination='+encodeURIComponent(destination.lat+','+destination.lng)+'&travelmode=transit';
+}
 function openPlaceDetail(p){
  const card=document.querySelector('#cards .place[data-place-id="'+p.id+'"]')||document.querySelector('#savedCards .place[data-place-id="'+p.id+'"]');
  const photos=card?[...card.querySelectorAll('[data-photo]')].map(a=>a.dataset.photo):[];
@@ -238,8 +250,9 @@ function openPlaceDetail(p){
  if(photos[0]){const img=document.createElement('img');img.src=photos[0];img.alt=p.name;img.loading='eager';img.onclick=()=>{document.getElementById('viewerImage').src=photos[0];document.getElementById('photoViewer').classList.add('open');};hero.insertBefore(img,label);}
  label.innerHTML='<small>'+esc(p.dayLabel)+' · '+esc(p.time)+'</small><h2>'+esc(p.name)+'</h2>';
  const gallery=photos.length>1?'<div class="detail-gallery">'+photos.slice(1).map((url,i)=>'<button type="button" data-detail-photo="'+esc(url)+'" aria-label="เปิดภาพเพิ่มเติม '+(i+2)+'"><img loading="lazy" src="'+esc(url)+'" alt="'+esc(p.name)+'"></button>').join('')+'</div>':'';
- const saved=savedPlaces.has(p.id);
- content.innerHTML='<div class="detail-meta">'+esc(catNames[p.cat]||'สถานที่')+' · '+esc(p.dayLabel)+' · '+esc(p.time)+'</div><section class="detail-section"><h3>รายละเอียดสถานที่</h3><p>'+esc(p.detail)+'</p></section><section class="detail-section"><h3>บันทึกการเดินทาง</h3><p>'+esc(p.note||'ไม่มีหมายเหตุเพิ่มเติม')+'</p></section>'+(gallery?'<section class="detail-section"><h3>ภาพบรรยากาศ</h3>'+gallery+'</section>':'')+'<div class="detail-actions"><a class="detail-action primary" href="'+gm(p)+'" target="_blank" rel="noopener">นำทางด้วย Google Maps ↗</a><button class="detail-action" id="detailSave" type="button">'+(saved?'♥ บันทึกแล้ว':'♡ บันทึกสถานที่')+'</button></div>';
+ const saved=savedPlaces.has(p.id),nearby=nearestTripStation(p);
+ const stationBlock=nearby?'<section class="detail-section"><h3>สถานีที่อยู่ใกล้ในแผนทริป</h3><p><strong>'+esc(nearby.station.name)+'</strong> · ประมาณ '+nearby.distance.toFixed(1)+' กม. จากสถานที่ (ระยะเส้นตรง)</p><div class="detail-actions"><a class="detail-action" href="'+mapsTransitUrl(nearby.station,p)+'" target="_blank" rel="noopener">เส้นทางจากสถานีด้วยรถสาธารณะ ↗</a><a class="detail-action" href="'+gm(nearby.station)+'" target="_blank" rel="noopener">ดูสถานีบนแผนที่ ↗</a></div></section>':'<section class="detail-section"><h3>สถานีใกล้เคียง</h3><p>แผนทริปฉบับนี้ยังไม่มีพิกัดสถานีใกล้เคียงที่ยืนยันได้ จึงแสดงเส้นทางตามรายละเอียดเดิมแทน เพื่อไม่ระบุสถานีผิด</p></section>';
+ content.innerHTML='<div class="detail-meta">'+esc(catNames[p.cat]||'สถานที่')+' · '+esc(p.dayLabel)+' · '+esc(p.time)+'</div><section class="detail-section"><h3>รายละเอียดสถานที่</h3><p>'+esc(p.detail)+'</p></section><section class="detail-section"><h3>บันทึกการเดินทาง</h3><p>'+esc(p.note||'ไม่มีหมายเหตุเพิ่มเติม')+'</p></section>'+stationBlock+(gallery?'<section class="detail-section"><h3>ภาพบรรยากาศ</h3>'+gallery+'</section>':'')+'<div class="detail-actions"><a class="detail-action primary" href="'+gm(p)+'" target="_blank" rel="noopener">นำทางด้วย Google Maps ↗</a><button class="detail-action" id="detailSave" type="button">'+(saved?'♥ บันทึกแล้ว':'♡ บันทึกสถานที่')+'</button></div>';
  content.querySelectorAll('[data-detail-photo]').forEach(b=>b.addEventListener('click',()=>{document.getElementById('viewerImage').src=b.dataset.detailPhoto;document.getElementById('photoViewer').classList.add('open');}));
  document.getElementById('detailSave').onclick=()=>{if(savedPlaces.has(p.id))savedPlaces.delete(p.id);else savedPlaces.add(p.id);persistSaved();document.getElementById('detailSave').textContent=savedPlaces.has(p.id)?'♥ บันทึกแล้ว':'♡ บันทึกสถานที่';if(currentView==='saved')buildSaved();};
  document.getElementById('placeDetail').classList.add('open');document.body.classList.add('detail-open');document.getElementById('placeDetail').scrollTop=0;
